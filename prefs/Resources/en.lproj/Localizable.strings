@@ -1,0 +1,31 @@
+"SEARCH_PHRASES_PLACEHOLDER" = "Search phrase or replacement";
+"NOTICE_TITLE" = "Notice";
+"OK" = "OK";
+"RESPRING_NOTICE_MESSAGE" = "To apply this replacement system-wide, you'll need to respring. Alternatively, you can close and reopen any app to apply it there.";
+
+"ADD_PHRASE_TITLE" = "Add Phrase";
+"EDIT_PHRASE_TITLE" = "Edit Phrase";
+"PHRASE_LABEL" = "Phrase";
+"REPLACEMENT_LABEL" = "Replacement";
+"CASE_SENSITIVE_LABEL" = "Case Sensitive";
+"COMPRESS_LABEL" = "Compress to fit";
+"COMPRESS_SECTION_TITLE" = "Compression";
+"COMPRESS_FOOTER" = "When enabled, if the replacement text is longer than the original, it will be compressed horizontally to fit the original space.";
+"SCOPE_SECTION_TITLE" = "Scope";
+"APPS_LABEL" = "Apps";
+"APPS_DESC_ALL" = "All apps";
+"APPS_DESC_WHITELIST_NONE" = "Only selected (none)";
+"APPS_DESC_WHITELIST_FMT" = "Only selected (%lu)";
+"APPS_DESC_BLACKLIST_NONE" = "Exclude selected (none)";
+"APPS_DESC_BLACKLIST_FMT" = "Exclude selected (%lu)";
+
+"APP_SCOPE_TITLE" = "Scope";
+"SEARCH_APPS_PLACEHOLDER" = "Search app name or Bundle ID";
+"MODE_SECTION_TITLE" = "Apply to";
+"MODE_ALL" = "All apps";
+"MODE_WHITELIST" = "Only selected (whitelist)";
+"MODE_BLACKLIST" = "Exclude selected (blacklist)";
+"MODE_FOOTER_ALL" = "This replacement applies to all apps.";
+"MODE_FOOTER_WHITELIST" = "Applies only to the selected apps; other apps are unaffected.";
+"MODE_FOOTER_BLACKLIST" = "Selected apps are excluded; all other apps are affected.";
+"APPS_LIST_SECTION_FMT" = "Apps (selected %lu)";

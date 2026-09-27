@@ -1,0 +1,31 @@
+"SEARCH_PHRASES_PLACEHOLDER" = "フレーズまたは置換後を検索";
+"NOTICE_TITLE" = "お知らせ";
+"OK" = "OK";
+"RESPRING_NOTICE_MESSAGE" = "この置換をシステム全体に反映するには、リスプリングが必要です。または、対象のアプリを閉じて開き直すと、そのアプリ内で反映されます。";
+
+"ADD_PHRASE_TITLE" = "フレーズを追加";
+"EDIT_PHRASE_TITLE" = "フレーズを編集";
+"PHRASE_LABEL" = "フレーズ";
+"REPLACEMENT_LABEL" = "置換後";
+"CASE_SENSITIVE_LABEL" = "大文字小文字を区別";
+"COMPRESS_LABEL" = "幅を圧縮して収める";
+"COMPRESS_SECTION_TITLE" = "圧縮";
+"COMPRESS_FOOTER" = "オンにすると、置換後のテキストが元より長い場合、元のスペースに収まるよう横方向に圧縮されます。";
+"SCOPE_SECTION_TITLE" = "適用範囲";
+"APPS_LABEL" = "アプリ";
+"APPS_DESC_ALL" = "すべてのアプリ";
+"APPS_DESC_WHITELIST_NONE" = "選択のみ（未選択）";
+"APPS_DESC_WHITELIST_FMT" = "選択のみ（%lu 件）";
+"APPS_DESC_BLACKLIST_NONE" = "選択を除外（未選択）";
+"APPS_DESC_BLACKLIST_FMT" = "選択を除外（%lu 件）";
+
+"APP_SCOPE_TITLE" = "適用範囲";
+"SEARCH_APPS_PLACEHOLDER" = "アプリ名または Bundle ID で検索";
+"MODE_SECTION_TITLE" = "適用範囲";
+"MODE_ALL" = "すべてのアプリ";
+"MODE_WHITELIST" = "選択のみ（ホワイトリスト）";
+"MODE_BLACKLIST" = "選択を除外（ブラックリスト）";
+"MODE_FOOTER_ALL" = "この置換はすべてのアプリに適用されます。";
+"MODE_FOOTER_WHITELIST" = "選択したアプリのみに適用され、それ以外には適用されません。";
+"MODE_FOOTER_BLACKLIST" = "選択したアプリには適用されず、それ以外すべてに適用されます。";
+"APPS_LIST_SECTION_FMT" = "アプリ一覧（選択 %lu 件）";

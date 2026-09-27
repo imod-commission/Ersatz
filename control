@@ -1,0 +1,19 @@
+Package: com.imodcommission.ersatz
+Name: Ersatz
+Depends: mobilesubstrate, preferenceloader, firmware (>= 15.0)
+Version: 2.0
+Architecture: iphoneos-arm64
+Description: Replace any text, system-wide!
+ Fork of Ersatz by Skitty, updated for roothide and extended.
+ .
+ Features:
+ - RootHide support
+ - Search bar (matches phrase and replacement)
+ - Longest-phrase-first replacement order
+ - Adaptive label sizing (widen first, then shrink font)
+ - Per-rule app whitelist / blacklist (with app picker + search)
+ - English, Traditional/Simplified Chinese, Japanese localizations
+Maintainer: imod_commission
+Author: Skitty, TweakDev22, imod_commission
+Section: Tweaks
+Icon: https://skitty.xyz/repo/icons/xyz.skitty.ersatz.png

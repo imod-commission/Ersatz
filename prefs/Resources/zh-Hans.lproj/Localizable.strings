@@ -1,0 +1,31 @@
+"SEARCH_PHRASES_PLACEHOLDER" = "搜索短语或替换内容";
+"NOTICE_TITLE" = "提示";
+"OK" = "好";
+"RESPRING_NOTICE_MESSAGE" = "要让该替换全局生效，需要注销（Respring）。也可以关闭并重新打开某个 App 让它在其中生效。";
+
+"ADD_PHRASE_TITLE" = "添加短语";
+"EDIT_PHRASE_TITLE" = "编辑短语";
+"PHRASE_LABEL" = "短语";
+"REPLACEMENT_LABEL" = "替换为";
+"CASE_SENSITIVE_LABEL" = "区分大小写";
+"COMPRESS_LABEL" = "压缩以适应";
+"COMPRESS_SECTION_TITLE" = "压缩";
+"COMPRESS_FOOTER" = "开启后，若替换文本比原文本更长，将横向压缩以塞进原有位置。";
+"SCOPE_SECTION_TITLE" = "适用范围";
+"APPS_LABEL" = "应用";
+"APPS_DESC_ALL" = "全部应用";
+"APPS_DESC_WHITELIST_NONE" = "仅选中（未选）";
+"APPS_DESC_WHITELIST_FMT" = "仅选中（%lu 个）";
+"APPS_DESC_BLACKLIST_NONE" = "排除选中（未选）";
+"APPS_DESC_BLACKLIST_FMT" = "排除选中（%lu 个）";
+
+"APP_SCOPE_TITLE" = "适用范围";
+"SEARCH_APPS_PLACEHOLDER" = "搜索应用名或 Bundle ID";
+"MODE_SECTION_TITLE" = "应用范围";
+"MODE_ALL" = "全部应用";
+"MODE_WHITELIST" = "仅选中（白名单）";
+"MODE_BLACKLIST" = "排除选中（黑名单）";
+"MODE_FOOTER_ALL" = "该替换对全部应用生效。";
+"MODE_FOOTER_WHITELIST" = "只对勾选的应用生效，其余应用不受影响。";
+"MODE_FOOTER_BLACKLIST" = "勾选的应用不生效，其余应用全部生效。";
+"APPS_LIST_SECTION_FMT" = "应用列表（已选 %lu）";

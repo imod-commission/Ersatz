@@ -1,0 +1,31 @@
+"SEARCH_PHRASES_PLACEHOLDER" = "搜尋短語或取代內容";
+"NOTICE_TITLE" = "提示";
+"OK" = "好";
+"RESPRING_NOTICE_MESSAGE" = "要讓此取代全域生效，需要重新載入（Respring）。也可以關閉並重新開啟某個 App 讓它在其中生效。";
+
+"ADD_PHRASE_TITLE" = "新增短語";
+"EDIT_PHRASE_TITLE" = "編輯短語";
+"PHRASE_LABEL" = "短語";
+"REPLACEMENT_LABEL" = "取代為";
+"CASE_SENSITIVE_LABEL" = "區分大小寫";
+"COMPRESS_LABEL" = "壓縮以適應";
+"COMPRESS_SECTION_TITLE" = "壓縮";
+"COMPRESS_FOOTER" = "開啟後，若取代文字比原文更長，將橫向壓縮以塞進原有位置。";
+"SCOPE_SECTION_TITLE" = "適用範圍";
+"APPS_LABEL" = "應用程式";
+"APPS_DESC_ALL" = "全部應用程式";
+"APPS_DESC_WHITELIST_NONE" = "僅選取（未選）";
+"APPS_DESC_WHITELIST_FMT" = "僅選取（%lu 個）";
+"APPS_DESC_BLACKLIST_NONE" = "排除選取（未選）";
+"APPS_DESC_BLACKLIST_FMT" = "排除選取（%lu 個）";
+
+"APP_SCOPE_TITLE" = "適用範圍";
+"SEARCH_APPS_PLACEHOLDER" = "搜尋應用程式名稱或 Bundle ID";
+"MODE_SECTION_TITLE" = "應用範圍";
+"MODE_ALL" = "全部應用程式";
+"MODE_WHITELIST" = "僅選取（白名單）";
+"MODE_BLACKLIST" = "排除選取（黑名單）";
+"MODE_FOOTER_ALL" = "此取代對全部應用程式生效。";
+"MODE_FOOTER_WHITELIST" = "只對勾選的應用程式生效，其餘應用程式不受影響。";
+"MODE_FOOTER_BLACKLIST" = "勾選的應用程式不生效，其餘應用程式全部生效。";
+"APPS_LIST_SECTION_FMT" = "應用程式列表（已選 %lu）";
