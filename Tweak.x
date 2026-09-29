@@ -26,8 +26,8 @@ static NSArray *orderedFinds;
 #define kMaxTextLen     1000
 #define kMaxAttrLen     1000
 #define kMinExpandRatio 0.55
-#define kMaxLogSize     (512 * 1024)   // 单个日志上限 512KB
-#define kLogCheckEvery  200            // 每 200 条检查一次大小
+#define kMaxLogSize     (512 * 1024)
+#define kLogCheckEvery  200
 #define NOW_SEC()       ((double)[NSDate timeIntervalSinceReferenceDate])
 
 static double gBreakUntil = 0;
@@ -39,7 +39,6 @@ static NSFileHandle *gLogFileHandle;
 static NSString *gLogPath;
 static NSUInteger gLogWriteCount = 0;
 
-// 按组合字符边界安全截断，防止切断 emoji / CJK 产生乱码
 static NSString *safeTruncate(NSString *s, NSUInteger maxChars) {
     if (s == nil) return @"";
     if (s.length <= maxChars) return s;
@@ -48,7 +47,6 @@ static NSString *safeTruncate(NSString *s, NSUInteger maxChars) {
     return [out stringByAppendingString:@"…"];
 }
 
-// 日志过大时轮转：当前 → .old，旧的 .old 删除
 static void rotateLogIfNeeded(void) {
     if (!gLogPath) return;
     NSFileManager *fm = [NSFileManager defaultManager];
@@ -79,7 +77,6 @@ static void logInit(void) {
         [fm createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
     }
 
-    // 启动时检查一次
     NSDictionary *attrs = [fm attributesOfItemAtPath:gLogPath error:nil];
     if ([attrs fileSize] >= kMaxLogSize) {
         NSString *oldPath = [gLogPath stringByAppendingString:@".old"];
@@ -113,9 +110,7 @@ static void elog(NSString *fmt, ...) {
     NSString *line = [NSString stringWithFormat:@"[%@] %@\n", [df stringFromDate:[NSDate date]], msg];
 
     NSData *data = [line dataUsingEncoding:NSUTF8StringEncoding];
-    if (data == nil) {
-        data = [line dataUsingEncoding:NSUTF8StringEncoding allowLossyConversion:YES];
-    }
+    if (data == nil) data = [line dataUsingEncoding:NSUTF8StringEncoding allowLossyConversion:YES];
     if (data == nil) return;
 
     dispatch_async(gLogQueue, ^{
@@ -158,7 +153,6 @@ static BOOL mayContainAny(NSString *text) {
 
 #pragma mark - 缓存
 
-// gReplaceCache 值: @{@"t": NSString, @"c": @(BOOL shouldCompress)}
 static NSCache<NSString *, NSDictionary *> *gReplaceCache;
 
 static const void *kPendingKey = &kPendingKey;
@@ -224,21 +218,153 @@ static void PrefsChanged(CFNotificationCenterRef c, void *o, CFStringRef n, cons
     refreshPrefs();
 }
 
-#pragma mark - 替换
+#pragma mark - 替换工具
 
+// 判断一个 unichar 是否属于"单词字符"（字母 / 数字 / 下划线）
+static BOOL isWordChar(unichar c) {
+    if (c == '_') return YES;
+    if (c < 128) {
+        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    }
+    // 中日韩等：用系统字符集判定
+    return [[NSCharacterSet alphanumericCharacterSet] characterIsMember:c];
+}
+
+// 普通子串替换
 static NSString *doReplace(NSString *s, NSString *find, NSString *repl, BOOL cs) {
     if (s == nil || find == nil || repl == nil) return s;
     if (cs) return [s stringByReplacingOccurrencesOfString:find withString:repl];
     return [s stringByReplacingOccurrencesOfString:find withString:repl options:NSCaseInsensitiveSearch range:NSMakeRange(0, [s length])];
 }
 
-// 返回替换结果；outShouldCompress 表示本次命中的规则中是否至少有一条 compress=YES
+// 整词替换：只在词边界替换
+static NSString *doReplaceWholeWord(NSString *s, NSString *find, NSString *repl, BOOL cs) {
+    if (s == nil || find == nil || repl == nil) return s;
+    if (s.length == 0 || find.length == 0) return s;
+
+    NSStringCompareOptions opts = cs ? 0 : NSCaseInsensitiveSearch;
+    NSUInteger srcLen = s.length;
+    NSMutableString *out = [NSMutableString stringWithCapacity:srcLen];
+    NSUInteger lastEnd = 0;
+    NSRange searchRange = NSMakeRange(0, srcLen);
+    BOOL anyHit = NO;
+
+    while (searchRange.location < srcLen) {
+        NSRange r = [s rangeOfString:find options:opts range:searchRange];
+        if (r.location == NSNotFound) break;
+
+        // 左边界
+        BOOL leftOK = YES;
+        if (r.location > 0) {
+            if (isWordChar([s characterAtIndex:r.location - 1])) leftOK = NO;
+        }
+        // 右边界
+        BOOL rightOK = YES;
+        NSUInteger rightIdx = r.location + r.length;
+        if (rightIdx < srcLen) {
+            if (isWordChar([s characterAtIndex:rightIdx])) rightOK = NO;
+        }
+
+        if (leftOK && rightOK) {
+            [out appendString:[s substringWithRange:NSMakeRange(lastEnd, r.location - lastEnd)]];
+            [out appendString:repl];
+            lastEnd = r.location + r.length;
+            anyHit = YES;
+        }
+
+        searchRange.location = r.location + 1;
+        if (searchRange.location >= srcLen) break;
+        searchRange.length = srcLen - searchRange.location;
+    }
+
+    if (!anyHit) return s;
+    [out appendString:[s substringWithRange:NSMakeRange(lastEnd, srcLen - lastEnd)]];
+    return out;
+}
+
+// NSAttributedString 普通子串替换
+static NSAttributedString *attrReplace(NSAttributedString *orig, NSString *find, NSString *repl) {
+    if (orig == nil || find == nil || repl == nil) return orig;
+    NSMutableAttributedString *m = [orig mutableCopy];
+    BOOL single = [repl containsString:find];
+    NSUInteger iter = 0;
+
+    while ([m.mutableString containsString:find]) {
+        if (single) {
+            if (iter >= 1) break;
+        } else {
+            if (iter >= kAttrMaxIter) {
+                elog(@"ATTR_LOOP_LIMIT | find=\"%@\" repl=\"%@\"", find, repl);
+                break;
+            }
+        }
+        iter++;
+
+        NSRange r = [m.mutableString rangeOfString:find];
+        NSMutableAttributedString *rs = [[NSMutableAttributedString alloc] initWithString:repl];
+        [m enumerateAttributesInRange:r options:0 usingBlock:^(NSDictionary *attrs, NSRange range, BOOL *stop) {
+            [rs addAttributes:attrs range:NSMakeRange(0, rs.length)];
+        }];
+        [m replaceCharactersInRange:r withAttributedString:rs];
+    }
+    return [m copy];
+}
+
+// NSAttributedString 整词替换
+static NSAttributedString *attrReplaceWholeWord(NSAttributedString *orig, NSString *find, NSString *repl, BOOL cs) {
+    if (orig == nil || find == nil || repl == nil) return orig;
+    if (orig.length == 0 || find.length == 0) return orig;
+
+    NSStringCompareOptions opts = cs ? 0 : NSCaseInsensitiveSearch;
+    NSMutableAttributedString *m = [orig mutableCopy];
+    NSUInteger srcLen = m.length;
+    NSMutableArray *ranges = [NSMutableArray array];
+    NSRange searchRange = NSMakeRange(0, srcLen);
+
+    while (searchRange.location < srcLen) {
+        NSRange r = [m.string rangeOfString:find options:opts range:searchRange];
+        if (r.location == NSNotFound) break;
+
+        BOOL leftOK = YES;
+        if (r.location > 0) {
+            if (isWordChar([m.string characterAtIndex:r.location - 1])) leftOK = NO;
+        }
+        BOOL rightOK = YES;
+        NSUInteger rightIdx = r.location + r.length;
+        if (rightIdx < srcLen) {
+            if (isWordChar([m.string characterAtIndex:rightIdx])) rightOK = NO;
+        }
+
+        if (leftOK && rightOK) {
+            [ranges addObject:[NSValue valueWithRange:r]];
+        }
+
+        searchRange.location = r.location + 1;
+        if (searchRange.location >= srcLen) break;
+        searchRange.length = srcLen - searchRange.location;
+    }
+
+    // 从后往前替换，避免 range 偏移
+    for (NSInteger i = (NSInteger)ranges.count - 1; i >= 0; i--) {
+        NSRange r = [(NSValue *)ranges[i] rangeValue];
+        NSMutableAttributedString *rs = [[NSMutableAttributedString alloc] initWithString:repl];
+        [m enumerateAttributesInRange:r options:0 usingBlock:^(NSDictionary *attrs, NSRange range, BOOL *stop) {
+            [rs addAttributes:attrs range:NSMakeRange(0, rs.length)];
+        }];
+        [m replaceCharactersInRange:r withAttributedString:rs];
+    }
+    return [m copy];
+}
+
+#pragma mark - 规则应用
+
+// 返回替换结果；outShouldCompress 表示命中的规则中是否有 compress=YES
 static NSString *applyCached(NSString *text, BOOL *outShouldCompress) {
     if (outShouldCompress) *outShouldCompress = NO;
     if (text == nil || text.length == 0) return text;
     if (text.length > kMaxTextLen) return text;
 
-    if (NOW_SEC() < gBreakUntil) return text;  // 熔断期间用原文
+    if (NOW_SEC() < gBreakUntil) return text;
 
     NSDictionary *cached = [gReplaceCache objectForKey:text];
     if (cached) {
@@ -274,13 +400,18 @@ static NSString *applyCached(NSString *text, BOOL *outShouldCompress) {
         NSString *repl = [strings objectForKey:find];
         NSDictionary *rule = [keyedSettings objectForKey:find];
         BOOL cs = [[rule objectForKey:@"caseSensitive"] boolValue];
+        BOOL wholeWord = [[rule objectForKey:@"wholeWord"] boolValue];
 
         NSString *before = out;
-        out = doReplace(out, find, repl, cs);
+        if (wholeWord) {
+            out = doReplaceWholeWord(out, find, repl, cs);
+        } else {
+            out = doReplace(out, find, repl, cs);
+        }
 
         if (![before isEqualToString:out]) {
             if ([[rule objectForKey:@"compress"] boolValue]) shouldCompress = YES;
-            [hits addObject:[NSString stringWithFormat:@"%@>%@", find, repl]];
+            [hits addObject:[NSString stringWithFormat:@"%@>%@%@", find, repl, wholeWord ? @"(W)" : @""]];
         }
     }
 
@@ -295,33 +426,6 @@ static NSString *applyCached(NSString *text, BOOL *outShouldCompress) {
     [gReplaceCache setObject:@{@"t": out, @"c": @(shouldCompress)} forKey:text];
     if (outShouldCompress) *outShouldCompress = shouldCompress;
     return out;
-}
-
-static NSAttributedString *attrReplace(NSAttributedString *orig, NSString *find, NSString *repl) {
-    if (orig == nil || find == nil || repl == nil) return orig;
-    NSMutableAttributedString *m = [orig mutableCopy];
-    BOOL single = [repl containsString:find];
-    NSUInteger iter = 0;
-
-    while ([m.mutableString containsString:find]) {
-        if (single) {
-            if (iter >= 1) break;
-        } else {
-            if (iter >= kAttrMaxIter) {
-                elog(@"ATTR_LOOP_LIMIT | find=\"%@\" repl=\"%@\"", find, repl);
-                break;
-            }
-        }
-        iter++;
-
-        NSRange r = [m.mutableString rangeOfString:find];
-        NSMutableAttributedString *rs = [[NSMutableAttributedString alloc] initWithString:repl];
-        [m enumerateAttributesInRange:r options:0 usingBlock:^(NSDictionary *attrs, NSRange range, BOOL *stop) {
-            [rs addAttributes:attrs range:NSMakeRange(0, rs.length)];
-        }];
-        [m replaceCharactersInRange:r withAttributedString:rs];
-    }
-    return [m copy];
 }
 
 static NSAttributedString *applyRulesForAttr(NSAttributedString *attr, BOOL *outShouldCompress) {
@@ -339,18 +443,25 @@ static NSAttributedString *applyRulesForAttr(NSAttributedString *attr, BOOL *out
 
         NSString *repl = [strings objectForKey:find];
         NSDictionary *rule = [keyedSettings objectForKey:find];
+        BOOL cs = [[rule objectForKey:@"caseSensitive"] boolValue];
+        BOOL wholeWord = [[rule objectForKey:@"wholeWord"] boolValue];
+
         NSAttributedString *before = out;
-        out = attrReplace(out, find, repl);
+        if (wholeWord) {
+            out = attrReplaceWholeWord(out, find, repl, cs);
+        } else {
+            out = attrReplace(out, find, repl);
+        }
 
         if (![before.string isEqualToString:out.string]) {
             if ([[rule objectForKey:@"compress"] boolValue]) shouldCompress = YES;
-            [hits addObject:[NSString stringWithFormat:@"%@>%@", find, repl]];
+            [hits addObject:[NSString stringWithFormat:@"%@>%@%@", find, repl, wholeWord ? @"(W)" : @""]];
         }
     }
 
     if (hits.count > 0) {
-        elog(@"ATTR %.2fms | in=\"%@\" | out=\"%@\" | hits(%lu): %@",
-             0.0, safeTruncate(attr.string, 60), safeTruncate(out.string, 60),
+        elog(@"ATTR | in=\"%@\" | out=\"%@\" | hits(%lu): %@",
+             safeTruncate(attr.string, 60), safeTruncate(out.string, 60),
              (unsigned long)hits.count,
              [hits componentsJoinedByString:@", "]);
     }
@@ -368,7 +479,6 @@ static CGFloat availableWidthForLabel(UILabel *label) {
     return w;
 }
 
-// 返回 nil 表示"不需要压缩"；outWidthKnown 表示是否成功获取到宽度
 static NSAttributedString *fittedAttributedStringForLabel(NSString *text, UILabel *label, BOOL *outWidthKnown) {
     if (outWidthKnown) *outWidthKnown = NO;
     if (text.length == 0) return nil;
@@ -384,12 +494,11 @@ static NSAttributedString *fittedAttributedStringForLabel(NSString *text, UILabe
                                                                    attributes:@{NSFontAttributeName: font}];
     CGFloat naturalWidth = [natural size].width;
 
-    if (naturalWidth <= availableWidth) return nil;  // 放得下，不压
+    if (naturalWidth <= availableWidth) return nil;
 
     NSMutableAttributedString *m = [natural mutableCopy];
     NSInteger count = (NSInteger)text.length;
 
-    // 第一步：收紧字距
     CGFloat maxKernPerChar = font.pointSize * 0.12;
     CGFloat neededReduction = naturalWidth - availableWidth;
     CGFloat maxTotalKernReduction = (count > 1) ? (maxKernPerChar * (count - 1)) : 0.0;
@@ -400,7 +509,6 @@ static NSAttributedString *fittedAttributedStringForLabel(NSString *text, UILabe
         [m addAttribute:NSKernAttributeName value:@(kern) range:NSMakeRange(0, m.length)];
     }
 
-    // 第二步：还不够，压扁字形
     CGFloat afterKern = [m size].width;
     if (afterKern > availableWidth) {
         CGFloat ratio = availableWidth / afterKern;
@@ -411,7 +519,6 @@ static NSAttributedString *fittedAttributedStringForLabel(NSString *text, UILabe
     return m;
 }
 
-// 已压缩过的文本不再二次处理
 static BOOL isAlreadyAdjusted(NSAttributedString *attr) {
     if (attr.length == 0) return NO;
     __block BOOL hasKern = NO;
@@ -489,7 +596,7 @@ static BOOL isAlreadyAdjusted(NSAttributedString *attr) {
         objc_setAssociatedObject(self, kPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         [self setAttributedText:fitted];
     } else if (!widthKnown) {
-        // 宽度未知，保持 pending，等下次 layout
+        // 宽度未知，保留 pending 等下次
     } else {
         objc_setAssociatedObject(self, kPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
@@ -546,7 +653,11 @@ static BOOL isAlreadyAdjusted(NSAttributedString *attr) {
 - (void)setDisplayName:(id)text {
     if (enabled && orderedFinds.count > 0 && text) {
         for (NSString *find in orderedFinds) {
-            text = doReplace(text, find, [strings objectForKey:find], [[[keyedSettings objectForKey:find] objectForKey:@"caseSensitive"] boolValue]);
+            NSDictionary *rule = [keyedSettings objectForKey:find];
+            BOOL cs = [[rule objectForKey:@"caseSensitive"] boolValue];
+            BOOL ww = [[rule objectForKey:@"wholeWord"] boolValue];
+            if (ww) text = doReplaceWholeWord(text, find, [strings objectForKey:find], cs);
+            else text = doReplace(text, find, [strings objectForKey:find], cs);
         }
     }
     %orig;
@@ -557,7 +668,11 @@ static BOOL isAlreadyAdjusted(NSAttributedString *attr) {
 - (void)setDisplayName:(id)text {
     if (enabled && orderedFinds.count > 0 && text) {
         for (NSString *find in orderedFinds) {
-            text = doReplace(text, find, [strings objectForKey:find], [[[keyedSettings objectForKey:find] objectForKey:@"caseSensitive"] boolValue]);
+            NSDictionary *rule = [keyedSettings objectForKey:find];
+            BOOL cs = [[rule objectForKey:@"caseSensitive"] boolValue];
+            BOOL ww = [[rule objectForKey:@"wholeWord"] boolValue];
+            if (ww) text = doReplaceWholeWord(text, find, [strings objectForKey:find], cs);
+            else text = doReplace(text, find, [strings objectForKey:find], cs);
         }
     }
     %orig;
@@ -571,7 +686,11 @@ static id ersatz_app_dn(id self, SEL _cmd) {
     id text = orig_app_dn(self, _cmd);
     if (enabled && orderedFinds.count > 0 && text) {
         for (NSString *find in orderedFinds) {
-            text = doReplace(text, find, [strings objectForKey:find], [[[keyedSettings objectForKey:find] objectForKey:@"caseSensitive"] boolValue]);
+            NSDictionary *rule = [keyedSettings objectForKey:find];
+            BOOL cs = [[rule objectForKey:@"caseSensitive"] boolValue];
+            BOOL ww = [[rule objectForKey:@"wholeWord"] boolValue];
+            if (ww) text = doReplaceWholeWord(text, find, [strings objectForKey:find], cs);
+            else text = doReplace(text, find, [strings objectForKey:find], cs);
         }
     }
     return text;
@@ -582,7 +701,11 @@ static id ersatz_folder_dn(id self, SEL _cmd) {
     id text = orig_folder_dn(self, _cmd);
     if (enabled && orderedFinds.count > 0 && text) {
         for (NSString *find in orderedFinds) {
-            text = doReplace(text, find, [strings objectForKey:find], [[[keyedSettings objectForKey:find] objectForKey:@"caseSensitive"] boolValue]);
+            NSDictionary *rule = [keyedSettings objectForKey:find];
+            BOOL cs = [[rule objectForKey:@"caseSensitive"] boolValue];
+            BOOL ww = [[rule objectForKey:@"wholeWord"] boolValue];
+            if (ww) text = doReplaceWholeWord(text, find, [strings objectForKey:find], cs);
+            else text = doReplace(text, find, [strings objectForKey:find], cs);
         }
     }
     return text;
