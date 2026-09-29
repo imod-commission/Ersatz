@@ -1,9 +1,10 @@
 // EZAddPhraseViewController.m
 #import "EZAddPhraseViewController.h"
 #import "EZAppListViewController.h"
-#import "EZLocalization.h"
 #import <Preferences/PSEditableTableCell.h>
 #import <Preferences/PSSwitchTableCell.h>
+
+#define EZ_L(key) NSLocalizedStringFromTableInBundle(key, @"Localizable", [NSBundle bundleForClass:[self class]], nil)
 
 @interface PSEditableTableCell (Missing)
 - (UITextField *)textField;
@@ -16,6 +17,7 @@
     if (self) {
         self.caseSensitive = YES;
         self.compress = NO;
+        self.wholeWord = NO;   // ← 默认关闭
         self.filterMode = @"all";
         self.apps = @[];
     }
@@ -24,7 +26,7 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = EZLoc(@"ADD_PHRASE_TITLE");
+    self.title = EZ_L(@"ADD_PHRASE_TITLE");
 
     UIBarButtonItem *doneButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:self action:@selector(addPhrase)];
     self.navigationItem.rightBarButtonItem = doneButton;
@@ -57,6 +59,7 @@
                replacement:self.replacement
              caseSensitive:self.caseSensitive
                   compress:self.compress
+                 wholeWord:self.wholeWord
                 filterMode:self.filterMode
                       apps:self.apps];
     [self.navigationController popViewControllerAnimated:YES];
@@ -66,76 +69,66 @@
     _target = target;
     [self updateDoneButtonState];
 }
-
 - (void)setReplacement:(NSString *)replacement {
     _replacement = replacement;
     [self updateDoneButtonState];
 }
 
-- (void)setTargetValue:(id)value forSpecifier:(PSSpecifier *)specifier {
-    self.target = value;
-}
-
-- (id)readTargetValue:(PSSpecifier *)specifier {
-    return self.target;
-}
+- (void)setTargetValue:(id)value forSpecifier:(PSSpecifier *)specifier { self.target = value; }
+- (id)readTargetValue:(PSSpecifier *)specifier { return self.target; }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 4;
+    return 3;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     switch (section) {
-        case 0: return 2;
-        case 1: return 1;
-        case 2: return 1;
-        case 3: return 1;
+        case 0: return 2;  // Phrase / Replacement
+        case 1: return 3;  // Case Sensitive / Compress / Whole Word ← 新增一行
+        case 2: return 1;  // 应用
     }
     return 0;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    if (section == 2) return EZLoc(@"COMPRESS_SECTION_TITLE");
-    if (section == 3) return EZLoc(@"SCOPE_SECTION_TITLE");
+    if (section == 1) return EZ_L(@"COMPRESS_SECTION_TITLE");
+    if (section == 2) return EZ_L(@"SCOPE_SECTION_TITLE");
     return nil;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    if (section == 2) {
-        return EZLoc(@"COMPRESS_FOOTER");
-    }
+    if (section == 1) return EZ_L(@"COMPRESS_FOOTER");
     return nil;
 }
 
 - (void)targetTextDidChange:(UITextField *)textField {
     self.target = textField.text;
 }
-
 - (void)replacementTextDidChange:(UITextField *)textField {
     self.replacement = textField.text;
 }
-
-- (void)caseSwitchDidChange:(UISwitch *)caseSwitch {
-    self.caseSensitive = caseSwitch.on;
+- (void)caseSwitchDidChange:(UISwitch *)sw {
+    self.caseSensitive = sw.on;
 }
-
-- (void)compressSwitchDidChange:(UISwitch *)compressSwitch {
-    self.compress = compressSwitch.on;
+- (void)compressSwitchDidChange:(UISwitch *)sw {
+    self.compress = sw.on;
+}
+- (void)wholeWordSwitchDidChange:(UISwitch *)sw {
+    self.wholeWord = sw.on;
 }
 
 - (NSString *)appsDescription {
-    NSString *mode = self.filterMode;
-    if (!mode) mode = @"all";
+    NSString *mode = self.filterMode ? self.filterMode : @"all";
     NSUInteger count = self.apps ? self.apps.count : 0;
 
     if ([mode isEqualToString:@"all"]) {
-        return EZLoc(@"APPS_DESC_ALL");
+        return EZ_L(@"APPS_DESC_ALL");
     } else if ([mode isEqualToString:@"whitelist"]) {
-        if (count == 0) return EZLoc(@"APPS_DESC_WHITELIST_NONE");
-        return EZLocFormat(@"APPS_DESC_WHITELIST_FMT", (unsigned long)count);
+        if (count == 0) return EZ_L(@"APPS_DESC_WHITELIST_NONE");
+        return [NSString stringWithFormat:EZ_L(@"APPS_DESC_WHITELIST_FMT"), (unsigned long)count];
     } else {
-        if (count == 0) return EZLoc(@"APPS_DESC_BLACKLIST_NONE");
-        return EZLocFormat(@"APPS_DESC_BLACKLIST_FMT", (unsigned long)count);
+        if (count == 0) return EZ_L(@"APPS_DESC_BLACKLIST_NONE");
+        return [NSString stringWithFormat:EZ_L(@"APPS_DESC_BLACKLIST_FMT"), (unsigned long)count];
     }
 }
 
@@ -151,7 +144,7 @@
     if (indexPath.section == 0 && indexPath.row == 0) {
         PSEditableTableCell *cell = [[PSEditableTableCell alloc] initWithStyle:1000 reuseIdentifier:@"EditTextCell"];
         cell.textLabel.tag = 317;
-        cell.textLabel.text = EZLoc(@"PHRASE_LABEL");
+        cell.textLabel.text = EZ_L(@"PHRASE_LABEL");
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         cell.textField.text = self.target;
         [cell.textField addTarget:self action:@selector(targetTextDidChange:) forControlEvents:UIControlEventEditingChanged];
@@ -159,7 +152,7 @@
     } else if (indexPath.section == 0 && indexPath.row == 1) {
         PSEditableTableCell *cell = [[PSEditableTableCell alloc] initWithStyle:1000 reuseIdentifier:@"EditTextCell"];
         cell.textLabel.tag = 317;
-        cell.textLabel.text = EZLoc(@"REPLACEMENT_LABEL");
+        cell.textLabel.text = EZ_L(@"REPLACEMENT_LABEL");
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         cell.textField.text = self.replacement;
         [cell.textField addTarget:self action:@selector(replacementTextDidChange:) forControlEvents:UIControlEventEditingChanged];
@@ -168,27 +161,36 @@
     } else if (indexPath.section == 1 && indexPath.row == 0) {
         PSSwitchTableCell *cell = [[PSSwitchTableCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"CaseSwitchCell" specifier:nil];
         cell.textLabel.tag = 317;
-        cell.textLabel.text = EZLoc(@"CASE_SENSITIVE_LABEL");
+        cell.textLabel.text = EZ_L(@"CASE_SENSITIVE_LABEL");
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         [cell setValue:[NSNumber numberWithBool:self.caseSensitive]];
         [cell.control addTarget:self action:@selector(caseSwitchDidChange:) forControlEvents:UIControlEventValueChanged];
         return cell;
-    } else if (indexPath.section == 2 && indexPath.row == 0) {
+    } else if (indexPath.section == 1 && indexPath.row == 1) {
         PSSwitchTableCell *cell = [[PSSwitchTableCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"CompressSwitchCell" specifier:nil];
         cell.textLabel.tag = 317;
-        cell.textLabel.text = EZLoc(@"COMPRESS_LABEL");
+        cell.textLabel.text = EZ_L(@"COMPRESS_LABEL");
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         [cell setValue:[NSNumber numberWithBool:self.compress]];
         [cell.control addTarget:self action:@selector(compressSwitchDidChange:) forControlEvents:UIControlEventValueChanged];
         return cell;
-    } else if (indexPath.section == 3 && indexPath.row == 0) {
+    } else if (indexPath.section == 1 && indexPath.row == 2) {
+        // ← 新增：整词匹配
+        PSSwitchTableCell *cell = [[PSSwitchTableCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"WholeWordSwitchCell" specifier:nil];
+        cell.textLabel.tag = 317;
+        cell.textLabel.text = EZ_L(@"WHOLE_WORD_LABEL");
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        [cell setValue:[NSNumber numberWithBool:self.wholeWord]];
+        [cell.control addTarget:self action:@selector(wholeWordSwitchDidChange:) forControlEvents:UIControlEventValueChanged];
+        return cell;
+    } else if (indexPath.section == 2 && indexPath.row == 0) {
         static NSString *appsCellID = @"AppsCell";
         UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:appsCellID];
         if (!cell) {
             cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:appsCellID];
         }
         cell.textLabel.tag = 317;
-        cell.textLabel.text = EZLoc(@"APPS_LABEL");
+        cell.textLabel.text = EZ_L(@"APPS_LABEL");
         cell.detailTextLabel.tag = 317;
         cell.detailTextLabel.text = [self appsDescription];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
@@ -199,7 +201,7 @@
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    if (indexPath.section == 3 && indexPath.row == 0) {
+    if (indexPath.section == 2 && indexPath.row == 0) {
         [self openAppPicker];
     }
 }

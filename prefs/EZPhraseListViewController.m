@@ -3,12 +3,14 @@
 #import "EZPhraseListViewController.h"
 #import "EZAddPhraseViewController.h"
 #import "EZEditPhraseViewController.h"
-#import "EZLocalization.h"
 #include <roothide.h>
 
+#define EZ_L(key) NSLocalizedStringFromTableInBundle(key, @"Localizable", [NSBundle bundleForClass:[self class]], nil)
 #define settingsPath jbroot(@"/var/mobile/Library/Preferences/xyz.skitty.ersatz.plist")
 
 @implementation EZPhraseListViewController
+
+#pragma mark - 生命周期
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -23,10 +25,11 @@
     self.tableView.dataSource = self;
     [self.view addSubview:self.tableView];
 
+    // 搜索框
     self.searchController = [[UISearchController alloc] initWithSearchResultsController:nil];
     self.searchController.searchResultsUpdater = self;
     self.searchController.obscuresBackgroundDuringPresentation = NO;
-    self.searchController.searchBar.placeholder = EZLoc(@"SEARCH_PHRASES_PLACEHOLDER");
+    self.searchController.searchBar.placeholder = EZ_L(@"SEARCH_PHRASES_PLACEHOLDER");
     if (@available(iOS 11.0, *)) {
         self.navigationItem.searchController = self.searchController;
         self.navigationItem.hidesSearchBarWhenScrolling = NO;
@@ -35,6 +38,7 @@
     }
     self.definesPresentationContext = YES;
 
+    // 加载偏好
     CFArrayRef keyList = CFPreferencesCopyKeyList(CFSTR("xyz.skitty.ersatz"), kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
     if (keyList) {
         _settings = (NSMutableDictionary *)CFBridgingRelease(CFPreferencesCopyMultiple(keyList, CFSTR("xyz.skitty.ersatz"), kCFPreferencesCurrentUser, kCFPreferencesAnyHost));
@@ -42,7 +46,6 @@
     } else {
         _settings = [[NSMutableDictionary alloc] initWithContentsOfFile:settingsPath];
     }
-
     if (!_settings) _settings = [[NSMutableDictionary alloc] init];
 
     NSMutableArray *mutableStrings = [_settings[@"strings"] mutableCopy];
@@ -55,6 +58,8 @@
     [self sortSettings];
 }
 
+#pragma mark - 保存
+
 - (void)updateSettings {
     CFPreferencesSetAppValue((CFStringRef)@"strings", (CFPropertyListRef)_settings[@"strings"], CFSTR("xyz.skitty.ersatz"));
 
@@ -66,6 +71,8 @@
 
     CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(), CFSTR("xyz.skitty.ersatz.prefschanged"), nil, nil, true);
 }
+
+#pragma mark - 构建显示数据
 
 - (void)sortSettings {
     _strings = [[NSMutableDictionary alloc] init];
@@ -86,12 +93,14 @@
 
 - (void)buildSortedStringsFromArray:(NSArray *)array {
     _sortedStrings = [[NSMutableDictionary alloc] init];
+
     NSMutableArray *keys = [NSMutableArray array];
     for (NSDictionary *obj in array) {
         NSString *phrase = obj[@"phrase"];
         if (phrase) [keys addObject:phrase];
     }
     NSArray *sortedKeys = [keys sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
+
     for (NSString *temp in sortedKeys) {
         NSString *first = [temp substringToIndex:1].uppercaseString;
         if (![_sortedStrings objectForKey:first]) {
@@ -122,11 +131,15 @@
     [self.tableView reloadData];
 }
 
+#pragma mark - UISearchResultsUpdating
+
 - (void)updateSearchResultsForSearchController:(UISearchController *)searchController {
     NSString *text = searchController.searchBar.text;
     if (text == nil) text = @"";
     [self filterContentForSearchText:text];
 }
+
+#pragma mark - 增删改
 
 - (void)addPhrase {
     EZAddPhraseViewController *addController = [[EZAddPhraseViewController alloc] init];
@@ -138,17 +151,17 @@
       replacement:(NSString *)replacement
     caseSensitive:(BOOL)caseSensitive
          compress:(BOOL)compress
+        wholeWord:(BOOL)wholeWord
        filterMode:(NSString *)filterMode
              apps:(NSArray *)apps {
+
     if (!_settings[@"shownPrompt"]) {
-        UIAlertController *alert = [UIAlertController
-                                    alertControllerWithTitle:EZLoc(@"NOTICE_TITLE")
-                                    message:EZLoc(@"RESPRING_NOTICE_MESSAGE")
-                                    preferredStyle:UIAlertControllerStyleAlert];
-        UIAlertAction *okButton = [UIAlertAction actionWithTitle:EZLoc(@"OK")
-                                                           style:UIAlertActionStyleDefault
-                                                         handler:^(UIAlertAction * action) {}];
-        [alert addAction:okButton];
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:EZ_L(@"NOTICE_TITLE")
+                                                                       message:EZ_L(@"RESPRING_NOTICE_MESSAGE")
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:EZ_L(@"OK")
+                                                  style:UIAlertActionStyleDefault
+                                                handler:nil]];
         [self presentViewController:alert animated:YES completion:nil];
         _settings[@"shownPrompt"] = @YES;
     }
@@ -161,6 +174,7 @@
         @"replacement": replacement,
         @"caseSensitive": @(caseSensitive),
         @"compress": @(compress),
+        @"wholeWord": @(wholeWord),
         @"filterMode": filterMode,
         @"apps": apps
     }];
@@ -174,8 +188,10 @@
        replacement:(NSString *)replacement
      caseSensitive:(BOOL)caseSensitive
           compress:(BOOL)compress
+         wholeWord:(BOOL)wholeWord
         filterMode:(NSString *)filterMode
               apps:(NSArray *)apps {
+
     NSDictionary *remove = nil;
     for (NSDictionary *obj in _settings[@"strings"]) {
         if ([obj[@"phrase"] isEqualToString:phrase]) {
@@ -191,6 +207,7 @@
         newObj[@"replacement"] = replacement;
         newObj[@"caseSensitive"] = @(caseSensitive);
         newObj[@"compress"] = @(compress);
+        newObj[@"wholeWord"] = @(wholeWord);
         newObj[@"filterMode"] = filterMode ? filterMode : @"all";
         newObj[@"apps"] = apps ? apps : @[];
         [_settings[@"strings"] addObject:newObj];
@@ -200,7 +217,8 @@
     [self sortSettings];
 }
 
-// Table view
+#pragma mark - Table view
+
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
     return [[_sortedStrings allKeys] count];
 }
@@ -259,6 +277,8 @@
     [[self navigationController] pushViewController:editController animated:YES];
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
 }
+
+#pragma mark - Swipe to delete
 
 - (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
     NSArray *sectionKeys = [[_sortedStrings allKeys] sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)];

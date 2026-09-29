@@ -1,6 +1,5 @@
 // EZEditPhraseViewController.m
 #import "EZEditPhraseViewController.h"
-#import "EZLocalization.h"
 
 @implementation EZEditPhraseViewController
 
@@ -12,6 +11,7 @@
         self.replacement = dict[@"replacement"];
         self.caseSensitive = [dict[@"caseSensitive"] boolValue];
         self.compress = [dict[@"compress"] boolValue];
+        self.wholeWord = [dict[@"wholeWord"] boolValue];   // ← 新增
 
         NSString *mode = dict[@"filterMode"];
         self.filterMode = mode ? mode : @"all";
@@ -24,7 +24,7 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = EZLoc(@"EDIT_PHRASE_TITLE");
+    self.title = NSLocalizedStringFromTableInBundle(@"EDIT_PHRASE_TITLE", @"Localizable", [NSBundle bundleForClass:[self class]], nil);
 }
 
 - (void)addPhrase {
@@ -35,6 +35,7 @@
                 replacement:self.replacement
               caseSensitive:self.caseSensitive
                    compress:self.compress
+                  wholeWord:self.wholeWord
                  filterMode:self.filterMode
                        apps:self.apps];
     [self.navigationController popViewControllerAnimated:YES];

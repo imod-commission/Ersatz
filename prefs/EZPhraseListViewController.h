@@ -14,6 +14,7 @@
       replacement:(NSString *)replacement
     caseSensitive:(BOOL)caseSensitive
          compress:(BOOL)compress
+        wholeWord:(BOOL)wholeWord
        filterMode:(NSString *)filterMode
              apps:(NSArray *)apps;
 
@@ -22,6 +23,7 @@
        replacement:(NSString *)replacement
      caseSensitive:(BOOL)caseSensitive
           compress:(BOOL)compress
+         wholeWord:(BOOL)wholeWord
         filterMode:(NSString *)filterMode
               apps:(NSArray *)apps;
 
