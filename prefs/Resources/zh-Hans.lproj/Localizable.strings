@@ -9,8 +9,9 @@
 "REPLACEMENT_LABEL" = "替换为";
 "CASE_SENSITIVE_LABEL" = "区分大小写";
 "COMPRESS_LABEL" = "压缩以适应";
-"COMPRESS_SECTION_TITLE" = "压缩";
-"COMPRESS_FOOTER" = "开启后，若替换文本比原文本更长，将横向压缩以塞进原有位置。";
+"WHOLE_WORD_LABEL" = "整词匹配";
+"COMPRESS_SECTION_TITLE" = "选项";
+"COMPRESS_FOOTER" = "区分大小写：仅当字母大小写完全一致时才替换。\n压缩以适应：若替换文本更长，将横向压缩以塞进原有位置。\n整词匹配：仅当短语不是更长单词的一部分时才替换（例如“no”不会命中“notification”）。";
 "SCOPE_SECTION_TITLE" = "适用范围";
 "APPS_LABEL" = "应用";
 "APPS_DESC_ALL" = "全部应用";
