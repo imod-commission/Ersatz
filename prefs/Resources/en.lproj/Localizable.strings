@@ -1,7 +1,7 @@
 "SEARCH_PHRASES_PLACEHOLDER" = "Search phrase or replacement";
 "NOTICE_TITLE" = "Notice";
 "OK" = "OK";
-"RESPRING_NOTICE_MESSAGE" = "To apply this replacement system-wide, you'll need to respring. Alternatively, you can close and reopen any app to apply it there.";
+"RESPRING_NOTICE_MESSAGE" = "For this replacement to take effect system-wide, a respring is required. Alternatively, you can close and reopen an app to apply it there.";
 
 "ADD_PHRASE_TITLE" = "Add Phrase";
 "EDIT_PHRASE_TITLE" = "Edit Phrase";
@@ -9,8 +9,9 @@
 "REPLACEMENT_LABEL" = "Replacement";
 "CASE_SENSITIVE_LABEL" = "Case Sensitive";
 "COMPRESS_LABEL" = "Compress to fit";
-"COMPRESS_SECTION_TITLE" = "Compression";
-"COMPRESS_FOOTER" = "When enabled, if the replacement text is longer than the original, it will be compressed horizontally to fit the original space.";
+"WHOLE_WORD_LABEL" = "Whole Word";
+"COMPRESS_SECTION_TITLE" = "Options";
+"COMPRESS_FOOTER" = "Case Sensitive: only match when the letter case is identical.\nCompress to fit: if the replacement is longer, compress it horizontally to fit the original space.\nWhole Word: only replace when the phrase is not part of a longer word (e.g. \"no\" won't match \"notification\").";
 "SCOPE_SECTION_TITLE" = "Scope";
 "APPS_LABEL" = "Apps";
 "APPS_DESC_ALL" = "All apps";
@@ -20,12 +21,12 @@
 "APPS_DESC_BLACKLIST_FMT" = "Exclude selected (%lu)";
 
 "APP_SCOPE_TITLE" = "Scope";
-"SEARCH_APPS_PLACEHOLDER" = "Search app name or Bundle ID";
-"MODE_SECTION_TITLE" = "Apply to";
+"SEARCH_APPS_PLACEHOLDER" = "Search app name or bundle ID";
+"MODE_SECTION_TITLE" = "App scope";
 "MODE_ALL" = "All apps";
 "MODE_WHITELIST" = "Only selected (whitelist)";
 "MODE_BLACKLIST" = "Exclude selected (blacklist)";
 "MODE_FOOTER_ALL" = "This replacement applies to all apps.";
-"MODE_FOOTER_WHITELIST" = "Applies only to the selected apps; other apps are unaffected.";
-"MODE_FOOTER_BLACKLIST" = "Selected apps are excluded; all other apps are affected.";
+"MODE_FOOTER_WHITELIST" = "Only selected apps are affected; others are untouched.";
+"MODE_FOOTER_BLACKLIST" = "Selected apps are skipped; all other apps are affected.";
 "APPS_LIST_SECTION_FMT" = "Apps (selected %lu)";
