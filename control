@@ -1,7 +1,7 @@
 Package: com.imodcommission.ersatz
 Name: Ersatz
 Depends: mobilesubstrate, preferenceloader, firmware (>= 15.0)
-Version: 2.0
+Version: 2.1
 Architecture: iphoneos-arm64
 Description: Replace any text, system-wide!
  Fork of Ersatz by Skitty, updated for roothide and extended.
