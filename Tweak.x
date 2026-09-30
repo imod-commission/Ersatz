@@ -220,24 +220,20 @@ static void PrefsChanged(CFNotificationCenterRef c, void *o, CFStringRef n, cons
 
 #pragma mark - 替换工具
 
-// 判断一个 unichar 是否属于"单词字符"（字母 / 数字 / 下划线）
 static BOOL isWordChar(unichar c) {
     if (c == '_') return YES;
     if (c < 128) {
         return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
     }
-    // 中日韩等：用系统字符集判定
     return [[NSCharacterSet alphanumericCharacterSet] characterIsMember:c];
 }
 
-// 普通子串替换
 static NSString *doReplace(NSString *s, NSString *find, NSString *repl, BOOL cs) {
     if (s == nil || find == nil || repl == nil) return s;
     if (cs) return [s stringByReplacingOccurrencesOfString:find withString:repl];
     return [s stringByReplacingOccurrencesOfString:find withString:repl options:NSCaseInsensitiveSearch range:NSMakeRange(0, [s length])];
 }
 
-// 整词替换：只在词边界替换
 static NSString *doReplaceWholeWord(NSString *s, NSString *find, NSString *repl, BOOL cs) {
     if (s == nil || find == nil || repl == nil) return s;
     if (s.length == 0 || find.length == 0) return s;
@@ -253,12 +249,10 @@ static NSString *doReplaceWholeWord(NSString *s, NSString *find, NSString *repl,
         NSRange r = [s rangeOfString:find options:opts range:searchRange];
         if (r.location == NSNotFound) break;
 
-        // 左边界
         BOOL leftOK = YES;
         if (r.location > 0) {
             if (isWordChar([s characterAtIndex:r.location - 1])) leftOK = NO;
         }
-        // 右边界
         BOOL rightOK = YES;
         NSUInteger rightIdx = r.location + r.length;
         if (rightIdx < srcLen) {
@@ -282,7 +276,6 @@ static NSString *doReplaceWholeWord(NSString *s, NSString *find, NSString *repl,
     return out;
 }
 
-// NSAttributedString 普通子串替换
 static NSAttributedString *attrReplace(NSAttributedString *orig, NSString *find, NSString *repl) {
     if (orig == nil || find == nil || repl == nil) return orig;
     NSMutableAttributedString *m = [orig mutableCopy];
@@ -310,7 +303,6 @@ static NSAttributedString *attrReplace(NSAttributedString *orig, NSString *find,
     return [m copy];
 }
 
-// NSAttributedString 整词替换
 static NSAttributedString *attrReplaceWholeWord(NSAttributedString *orig, NSString *find, NSString *repl, BOOL cs) {
     if (orig == nil || find == nil || repl == nil) return orig;
     if (orig.length == 0 || find.length == 0) return orig;
@@ -344,7 +336,6 @@ static NSAttributedString *attrReplaceWholeWord(NSAttributedString *orig, NSStri
         searchRange.length = srcLen - searchRange.location;
     }
 
-    // 从后往前替换，避免 range 偏移
     for (NSInteger i = (NSInteger)ranges.count - 1; i >= 0; i--) {
         NSRange r = [(NSValue *)ranges[i] rangeValue];
         NSMutableAttributedString *rs = [[NSMutableAttributedString alloc] initWithString:repl];
@@ -356,9 +347,16 @@ static NSAttributedString *attrReplaceWholeWord(NSAttributedString *orig, NSStri
     return [m copy];
 }
 
+// 完全匹配判定：整个文本与短语相等（是否区分大小写）
+static BOOL textMatchesExact(NSString *text, NSString *find, BOOL cs) {
+    if (text == nil || find == nil) return NO;
+    if (text.length != find.length) return NO;
+    if (cs) return [text isEqualToString:find];
+    return [text caseInsensitiveCompare:find] == NSOrderedSame;
+}
+
 #pragma mark - 规则应用
 
-// 返回替换结果；outShouldCompress 表示命中的规则中是否有 compress=YES
 static NSString *applyCached(NSString *text, BOOL *outShouldCompress) {
     if (outShouldCompress) *outShouldCompress = NO;
     if (text == nil || text.length == 0) return text;
@@ -395,12 +393,27 @@ static NSString *applyCached(NSString *text, BOOL *outShouldCompress) {
             }
         }
 
-        if ([out rangeOfString:find].location == NSNotFound) continue;
-
         NSString *repl = [strings objectForKey:find];
         NSDictionary *rule = [keyedSettings objectForKey:find];
         BOOL cs = [[rule objectForKey:@"caseSensitive"] boolValue];
         BOOL wholeWord = [[rule objectForKey:@"wholeWord"] boolValue];
+        BOOL exactMatch = [[rule objectForKey:@"exactMatch"] boolValue];
+
+        // 完全匹配：基于原始 text 判断，不是当前的 out
+        if (exactMatch) {
+            if (!textMatchesExact(text, find, cs)) continue;
+            // 完全匹配时，直接整体替换
+            NSString *before = out;
+            out = repl;
+            if (![before isEqualToString:out]) {
+                if ([[rule objectForKey:@"compress"] boolValue]) shouldCompress = YES;
+                [hits addObject:[NSString stringWithFormat:@"%@>%@(E)", find, repl]];
+            }
+            continue;
+        }
+
+        // 非完全匹配才需要先看子串是否存在
+        if ([out rangeOfString:find].location == NSNotFound) continue;
 
         NSString *before = out;
         if (wholeWord) {
@@ -437,14 +450,34 @@ static NSAttributedString *applyRulesForAttr(NSAttributedString *attr, BOOL *out
     NSAttributedString *out = attr;
     BOOL shouldCompress = NO;
     NSMutableArray *hits = [NSMutableArray array];
+    NSString *origString = attr.string;
 
     for (NSString *find in orderedFinds) {
-        if ([out.string rangeOfString:find].location == NSNotFound) continue;
-
         NSString *repl = [strings objectForKey:find];
         NSDictionary *rule = [keyedSettings objectForKey:find];
         BOOL cs = [[rule objectForKey:@"caseSensitive"] boolValue];
         BOOL wholeWord = [[rule objectForKey:@"wholeWord"] boolValue];
+        BOOL exactMatch = [[rule objectForKey:@"exactMatch"] boolValue];
+
+        if (exactMatch) {
+            if (!textMatchesExact(origString, find, cs)) continue;
+            NSAttributedString *before = out;
+            NSMutableAttributedString *rs = [[NSMutableAttributedString alloc] initWithString:repl];
+            // 保留原属性
+            if (before.length > 0) {
+                [before enumerateAttributesInRange:NSMakeRange(0, before.length) options:0 usingBlock:^(NSDictionary *attrs, NSRange range, BOOL *stop) {
+                    [rs addAttributes:attrs range:NSMakeRange(0, rs.length)];
+                }];
+            }
+            out = rs;
+            if (![before.string isEqualToString:out.string]) {
+                if ([[rule objectForKey:@"compress"] boolValue]) shouldCompress = YES;
+                [hits addObject:[NSString stringWithFormat:@"%@>%@(E)", find, repl]];
+            }
+            continue;
+        }
+
+        if ([out.string rangeOfString:find].location == NSNotFound) continue;
 
         NSAttributedString *before = out;
         if (wholeWord) {
@@ -470,7 +503,7 @@ static NSAttributedString *applyRulesForAttr(NSAttributedString *attr, BOOL *out
     return out;
 }
 
-#pragma mark - 自适应：kern 收紧 + expansion 压扁
+#pragma mark - 自适应
 
 static CGFloat availableWidthForLabel(UILabel *label) {
     CGFloat w = label.bounds.size.width;
@@ -596,7 +629,7 @@ static BOOL isAlreadyAdjusted(NSAttributedString *attr) {
         objc_setAssociatedObject(self, kPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         [self setAttributedText:fitted];
     } else if (!widthKnown) {
-        // 宽度未知，保留 pending 等下次
+        // 保留 pending
     } else {
         objc_setAssociatedObject(self, kPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
@@ -656,8 +689,14 @@ static BOOL isAlreadyAdjusted(NSAttributedString *attr) {
             NSDictionary *rule = [keyedSettings objectForKey:find];
             BOOL cs = [[rule objectForKey:@"caseSensitive"] boolValue];
             BOOL ww = [[rule objectForKey:@"wholeWord"] boolValue];
-            if (ww) text = doReplaceWholeWord(text, find, [strings objectForKey:find], cs);
-            else text = doReplace(text, find, [strings objectForKey:find], cs);
+            BOOL em = [[rule objectForKey:@"exactMatch"] boolValue];
+            if (em) {
+                if (textMatchesExact(text, find, cs)) text = [strings objectForKey:find];
+            } else if (ww) {
+                text = doReplaceWholeWord(text, find, [strings objectForKey:find], cs);
+            } else {
+                text = doReplace(text, find, [strings objectForKey:find], cs);
+            }
         }
     }
     %orig;
@@ -671,8 +710,14 @@ static BOOL isAlreadyAdjusted(NSAttributedString *attr) {
             NSDictionary *rule = [keyedSettings objectForKey:find];
             BOOL cs = [[rule objectForKey:@"caseSensitive"] boolValue];
             BOOL ww = [[rule objectForKey:@"wholeWord"] boolValue];
-            if (ww) text = doReplaceWholeWord(text, find, [strings objectForKey:find], cs);
-            else text = doReplace(text, find, [strings objectForKey:find], cs);
+            BOOL em = [[rule objectForKey:@"exactMatch"] boolValue];
+            if (em) {
+                if (textMatchesExact(text, find, cs)) text = [strings objectForKey:find];
+            } else if (ww) {
+                text = doReplaceWholeWord(text, find, [strings objectForKey:find], cs);
+            } else {
+                text = doReplace(text, find, [strings objectForKey:find], cs);
+            }
         }
     }
     %orig;
@@ -689,8 +734,14 @@ static id ersatz_app_dn(id self, SEL _cmd) {
             NSDictionary *rule = [keyedSettings objectForKey:find];
             BOOL cs = [[rule objectForKey:@"caseSensitive"] boolValue];
             BOOL ww = [[rule objectForKey:@"wholeWord"] boolValue];
-            if (ww) text = doReplaceWholeWord(text, find, [strings objectForKey:find], cs);
-            else text = doReplace(text, find, [strings objectForKey:find], cs);
+            BOOL em = [[rule objectForKey:@"exactMatch"] boolValue];
+            if (em) {
+                if (textMatchesExact(text, find, cs)) text = [strings objectForKey:find];
+            } else if (ww) {
+                text = doReplaceWholeWord(text, find, [strings objectForKey:find], cs);
+            } else {
+                text = doReplace(text, find, [strings objectForKey:find], cs);
+            }
         }
     }
     return text;
@@ -704,8 +755,14 @@ static id ersatz_folder_dn(id self, SEL _cmd) {
             NSDictionary *rule = [keyedSettings objectForKey:find];
             BOOL cs = [[rule objectForKey:@"caseSensitive"] boolValue];
             BOOL ww = [[rule objectForKey:@"wholeWord"] boolValue];
-            if (ww) text = doReplaceWholeWord(text, find, [strings objectForKey:find], cs);
-            else text = doReplace(text, find, [strings objectForKey:find], cs);
+            BOOL em = [[rule objectForKey:@"exactMatch"] boolValue];
+            if (em) {
+                if (textMatchesExact(text, find, cs)) text = [strings objectForKey:find];
+            } else if (ww) {
+                text = doReplaceWholeWord(text, find, [strings objectForKey:find], cs);
+            } else {
+                text = doReplace(text, find, [strings objectForKey:find], cs);
+            }
         }
     }
     return text;
