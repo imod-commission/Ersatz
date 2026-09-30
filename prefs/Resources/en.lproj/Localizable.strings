@@ -11,7 +11,8 @@
 "COMPRESS_LABEL" = "Compress to fit";
 "WHOLE_WORD_LABEL" = "Whole Word";
 "COMPRESS_SECTION_TITLE" = "Options";
-"COMPRESS_FOOTER" = "Case Sensitive: only match when the letter case is identical.\nCompress to fit: if the replacement is longer, compress it horizontally to fit the original space.\nWhole Word: only replace when the phrase is not part of a longer word (e.g. \"no\" won't match \"notification\").";
+"EXACT_MATCH_LABEL" = "Exact Match";
+"COMPRESS_FOOTER" = "Case Sensitive: only match when letter case is identical.\nCompress to fit: if the replacement is longer, compress it horizontally.\nWhole Word: only replace when the phrase is not part of a longer word.\nExact Match: only replace when the entire label text equals the phrase exactly.";
 "SCOPE_SECTION_TITLE" = "Scope";
 "APPS_LABEL" = "Apps";
 "APPS_DESC_ALL" = "All apps";
