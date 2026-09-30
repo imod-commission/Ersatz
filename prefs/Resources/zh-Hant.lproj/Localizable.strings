@@ -11,7 +11,8 @@
 "COMPRESS_LABEL" = "壓縮以適應";
 "WHOLE_WORD_LABEL" = "整詞比對";
 "COMPRESS_SECTION_TITLE" = "選項";
-"COMPRESS_FOOTER" = "區分大小寫：僅當字母大小寫完全一致時才替換。\n壓縮以適應：若替換文字更長，將橫向壓縮以塞進原有位置。\n整詞比對：僅當短語不是更長單字的一部分時才替換（例如「no」不會命中「notification」）。";
+"EXACT_MATCH_LABEL" = "完全比對";
+"COMPRESS_FOOTER" = "區分大小寫：僅當字母大小寫完全一致時才替換。\n壓縮以適應：若替換文字更長，將橫向壓縮以塞進原有位置。\n整詞比對：僅當短語不是更長單字的一部分時才替換。\n完全比對：僅當整個 label 文字與短語完全相等時才替換。";
 "SCOPE_SECTION_TITLE" = "適用範圍";
 "APPS_LABEL" = "應用";
 "APPS_DESC_ALL" = "全部應用";
