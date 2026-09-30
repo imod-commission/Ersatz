@@ -13,5 +13,6 @@
 @property (nonatomic, retain) NSArray  *apps;
 @property (nonatomic, retain) EZPhraseListViewController *parent;
 @property (nonatomic, retain) UITableView *tableView;
+@property (nonatomic, assign) BOOL exactMatch;   // ← 新增
 
 @end

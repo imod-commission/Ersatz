@@ -15,6 +15,7 @@
     caseSensitive:(BOOL)caseSensitive
          compress:(BOOL)compress
         wholeWord:(BOOL)wholeWord
+       exactMatch:(BOOL)exactMatch
        filterMode:(NSString *)filterMode
              apps:(NSArray *)apps;
 
@@ -24,6 +25,7 @@
      caseSensitive:(BOOL)caseSensitive
           compress:(BOOL)compress
          wholeWord:(BOOL)wholeWord
+        exactMatch:(BOOL)exactMatch
         filterMode:(NSString *)filterMode
               apps:(NSArray *)apps;
 

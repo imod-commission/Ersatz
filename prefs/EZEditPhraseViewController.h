@@ -1,5 +1,4 @@
 // EZEditPhraseViewController.h
-
 #import "EZAddPhraseViewController.h"
 
 @interface EZEditPhraseViewController : EZAddPhraseViewController

@@ -17,7 +17,8 @@
     if (self) {
         self.caseSensitive = YES;
         self.compress = NO;
-        self.wholeWord = NO;   // ← 默认关闭
+        self.wholeWord = NO;
+        self.exactMatch = NO;
         self.filterMode = @"all";
         self.apps = @[];
     }
@@ -60,6 +61,7 @@
              caseSensitive:self.caseSensitive
                   compress:self.compress
                  wholeWord:self.wholeWord
+                exactMatch:self.exactMatch
                 filterMode:self.filterMode
                       apps:self.apps];
     [self.navigationController popViewControllerAnimated:YES];
@@ -69,6 +71,7 @@
     _target = target;
     [self updateDoneButtonState];
 }
+
 - (void)setReplacement:(NSString *)replacement {
     _replacement = replacement;
     [self updateDoneButtonState];
@@ -77,15 +80,17 @@
 - (void)setTargetValue:(id)value forSpecifier:(PSSpecifier *)specifier { self.target = value; }
 - (id)readTargetValue:(PSSpecifier *)specifier { return self.target; }
 
+#pragma mark - Table view
+
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 3;
+    return 3;  // 0: 短语/替换 1: 选项 2: 适用范围
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     switch (section) {
-        case 0: return 2;  // Phrase / Replacement
-        case 1: return 3;  // Case Sensitive / Compress / Whole Word ← 新增一行
-        case 2: return 1;  // 应用
+        case 0: return 2;
+        case 1: return 4;  // Case / Compress / Whole Word / Exact Match
+        case 2: return 1;
     }
     return 0;
 }
@@ -100,6 +105,8 @@
     if (section == 1) return EZ_L(@"COMPRESS_FOOTER");
     return nil;
 }
+
+#pragma mark - Actions
 
 - (void)targetTextDidChange:(UITextField *)textField {
     self.target = textField.text;
@@ -116,6 +123,11 @@
 - (void)wholeWordSwitchDidChange:(UISwitch *)sw {
     self.wholeWord = sw.on;
 }
+- (void)exactMatchSwitchDidChange:(UISwitch *)sw {
+    self.exactMatch = sw.on;
+}
+
+#pragma mark - Apps 描述
 
 - (NSString *)appsDescription {
     NSString *mode = self.filterMode ? self.filterMode : @"all";
@@ -139,6 +151,8 @@
     vc.selectedApps = [self.apps mutableCopy] ?: [NSMutableArray array];
     [[self navigationController] pushViewController:vc animated:YES];
 }
+
+#pragma mark - Cell
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     if (indexPath.section == 0 && indexPath.row == 0) {
@@ -175,13 +189,20 @@
         [cell.control addTarget:self action:@selector(compressSwitchDidChange:) forControlEvents:UIControlEventValueChanged];
         return cell;
     } else if (indexPath.section == 1 && indexPath.row == 2) {
-        // ← 新增：整词匹配
         PSSwitchTableCell *cell = [[PSSwitchTableCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"WholeWordSwitchCell" specifier:nil];
         cell.textLabel.tag = 317;
         cell.textLabel.text = EZ_L(@"WHOLE_WORD_LABEL");
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         [cell setValue:[NSNumber numberWithBool:self.wholeWord]];
         [cell.control addTarget:self action:@selector(wholeWordSwitchDidChange:) forControlEvents:UIControlEventValueChanged];
+        return cell;
+    } else if (indexPath.section == 1 && indexPath.row == 3) {
+        PSSwitchTableCell *cell = [[PSSwitchTableCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"ExactMatchSwitchCell" specifier:nil];
+        cell.textLabel.tag = 317;
+        cell.textLabel.text = EZ_L(@"EXACT_MATCH_LABEL");
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        [cell setValue:[NSNumber numberWithBool:self.exactMatch]];
+        [cell.control addTarget:self action:@selector(exactMatchSwitchDidChange:) forControlEvents:UIControlEventValueChanged];
         return cell;
     } else if (indexPath.section == 2 && indexPath.row == 0) {
         static NSString *appsCellID = @"AppsCell";

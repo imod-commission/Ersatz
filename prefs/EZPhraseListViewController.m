@@ -147,11 +147,12 @@
     [[self navigationController] pushViewController:addController animated:YES];
 }
 
-- (void)addPhrase:(NSString *)phrase
+- (void)addPhrase:(NSString *)addPhrase
       replacement:(NSString *)replacement
     caseSensitive:(BOOL)caseSensitive
          compress:(BOOL)compress
         wholeWord:(BOOL)wholeWord
+       exactMatch:(BOOL)exactMatch
        filterMode:(NSString *)filterMode
              apps:(NSArray *)apps {
 
@@ -170,11 +171,12 @@
     if (!apps) apps = @[];
 
     [_settings[@"strings"] addObject:@{
-        @"phrase": phrase,
+        @"phrase": addPhrase,
         @"replacement": replacement,
         @"caseSensitive": @(caseSensitive),
         @"compress": @(compress),
         @"wholeWord": @(wholeWord),
+        @"exactMatch": @(exactMatch),
         @"filterMode": filterMode,
         @"apps": apps
     }];
@@ -189,6 +191,7 @@
      caseSensitive:(BOOL)caseSensitive
           compress:(BOOL)compress
          wholeWord:(BOOL)wholeWord
+        exactMatch:(BOOL)exactMatch
         filterMode:(NSString *)filterMode
               apps:(NSArray *)apps {
 
@@ -208,6 +211,7 @@
         newObj[@"caseSensitive"] = @(caseSensitive);
         newObj[@"compress"] = @(compress);
         newObj[@"wholeWord"] = @(wholeWord);
+        newObj[@"exactMatch"] = @(exactMatch);
         newObj[@"filterMode"] = filterMode ? filterMode : @"all";
         newObj[@"apps"] = apps ? apps : @[];
         [_settings[@"strings"] addObject:newObj];
