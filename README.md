@@ -9,6 +9,7 @@ Replace any text, system-wide!
 - Longest-phrase-first replacement order
 - Adaptive label sizing (widen first, then shrink font)
 - Whole-word replacement
+- Exact-match replacement
 - Per-rule app whitelist / blacklist (with app picker + search)
 - English, Traditional/Simplified Chinese, Japanese localizations
 - Logging
