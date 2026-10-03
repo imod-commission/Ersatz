@@ -32,6 +32,9 @@ static NSArray *orderedFinds;
 
 static double gBreakUntil = 0;
 
+// 规则版本号：每次 refreshPrefs 自增，用于失效 label 上的"上次结果"记录
+static NSUInteger gGeneration = 0;
+
 #pragma mark - 日志
 
 static dispatch_queue_t gLogQueue;
@@ -155,7 +158,29 @@ static BOOL mayContainAny(NSString *text) {
 
 static NSCache<NSString *, NSDictionary *> *gReplaceCache;
 
-static const void *kPendingKey = &kPendingKey;
+static const void *kPendingKey     = &kPendingKey;
+// label 上记录: @{@"text": 上次处理后的字符串, @"gen": 版本号}
+static const void *kLastResultKey  = &kLastResultKey;
+
+// 检查传入文本是否等于 label 上次处理后的结果（且版本一致）
+static BOOL labelMatchesLastResult(UILabel *label, NSString *text) {
+    if (!label || !text) return NO;
+    NSDictionary *d = objc_getAssociatedObject(label, kLastResultKey);
+    if (!d) return NO;
+    NSUInteger gen = [d[@"gen"] unsignedIntegerValue];
+    if (gen != gGeneration) return NO;
+    NSString *lastText = d[@"text"];
+    if (!lastText) return NO;
+    return [lastText isEqualToString:text];
+}
+
+// 记录 label 本次处理后的结果
+static void labelSetLastResult(UILabel *label, NSString *text) {
+    if (!label) return;
+    objc_setAssociatedObject(label, kLastResultKey,
+                             @{@"text": text ?: @"", @"gen": @(gGeneration)},
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
 
 #pragma mark - Preferences
 
@@ -211,7 +236,11 @@ void refreshPrefs(void) {
     [gReplaceCache removeAllObjects];
     rebuildMap();
 
-    elog(@"prefs refresh | bid=%@ | rules=%lu", bid, (unsigned long)orderedFinds.count);
+    // 规则变化：版本号 +1，让所有 label 的"上次结果"记录失效
+    gGeneration++;
+
+    elog(@"prefs refresh | bid=%@ | rules=%lu | gen=%lu",
+         bid, (unsigned long)orderedFinds.count, (unsigned long)gGeneration);
 }
 
 static void PrefsChanged(CFNotificationCenterRef c, void *o, CFStringRef n, const void *obj, CFDictionaryRef u) {
@@ -347,7 +376,6 @@ static NSAttributedString *attrReplaceWholeWord(NSAttributedString *orig, NSStri
     return [m copy];
 }
 
-// 完全匹配判定：整个文本与短语相等（是否区分大小写）
 static BOOL textMatchesExact(NSString *text, NSString *find, BOOL cs) {
     if (text == nil || find == nil) return NO;
     if (text.length != find.length) return NO;
@@ -399,10 +427,8 @@ static NSString *applyCached(NSString *text, BOOL *outShouldCompress) {
         BOOL wholeWord = [[rule objectForKey:@"wholeWord"] boolValue];
         BOOL exactMatch = [[rule objectForKey:@"exactMatch"] boolValue];
 
-        // 完全匹配：基于原始 text 判断，不是当前的 out
         if (exactMatch) {
             if (!textMatchesExact(text, find, cs)) continue;
-            // 完全匹配时，直接整体替换
             NSString *before = out;
             out = repl;
             if (![before isEqualToString:out]) {
@@ -412,7 +438,6 @@ static NSString *applyCached(NSString *text, BOOL *outShouldCompress) {
             continue;
         }
 
-        // 非完全匹配才需要先看子串是否存在
         if ([out rangeOfString:find].location == NSNotFound) continue;
 
         NSString *before = out;
@@ -463,7 +488,6 @@ static NSAttributedString *applyRulesForAttr(NSAttributedString *attr, BOOL *out
             if (!textMatchesExact(origString, find, cs)) continue;
             NSAttributedString *before = out;
             NSMutableAttributedString *rs = [[NSMutableAttributedString alloc] initWithString:repl];
-            // 保留原属性
             if (before.length > 0) {
                 [before enumerateAttributesInRange:NSMakeRange(0, before.length) options:0 usingBlock:^(NSDictionary *attrs, NSRange range, BOOL *stop) {
                     [rs addAttributes:attrs range:NSMakeRange(0, rs.length)];
@@ -578,30 +602,41 @@ static BOOL isAlreadyAdjusted(NSAttributedString *attr) {
 
 - (void)setText:(NSString *)text {
     if (enabled && orderedFinds.count > 0 && self.tag != 317 && text.length > 0) {
+        // 若文本等于上次处理后的结果，直接放行（避免内部 setAttributedText 再次进入）
+        if (labelMatchesLastResult(self, text)) {
+            %orig;
+            return;
+        }
+
         NSString *orig = text;
         BOOL shouldCompress = NO;
         NSString *newText = applyCached(text, &shouldCompress);
 
-        if (newText && ![orig isEqualToString:newText]) {
-            if (shouldCompress) {
-                BOOL widthKnown = NO;
-                NSAttributedString *fitted = fittedAttributedStringForLabel(newText, self, &widthKnown);
-                if (fitted) {
-                    objc_setAssociatedObject(self, kPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-                    [self setAttributedText:fitted];
-                    return;
-                } else if (!widthKnown) {
-                    objc_setAssociatedObject(self, kPendingKey, orig, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        if (newText) {
+            // 记录处理后的结果（无论是否发生替换）
+            labelSetLastResult(self, newText);
+
+            if (![orig isEqualToString:newText]) {
+                if (shouldCompress) {
+                    BOOL widthKnown = NO;
+                    NSAttributedString *fitted = fittedAttributedStringForLabel(newText, self, &widthKnown);
+                    if (fitted) {
+                        objc_setAssociatedObject(self, kPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                        [self setAttributedText:fitted];
+                        return;
+                    } else if (!widthKnown) {
+                        objc_setAssociatedObject(self, kPendingKey, orig, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                    } else {
+                        objc_setAssociatedObject(self, kPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                    }
                 } else {
                     objc_setAssociatedObject(self, kPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
                 }
             } else {
                 objc_setAssociatedObject(self, kPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             }
-        } else {
-            objc_setAssociatedObject(self, kPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            text = newText;
         }
-        text = newText;
     }
     %orig;
 }
@@ -627,6 +662,7 @@ static BOOL isAlreadyAdjusted(NSAttributedString *attr) {
 
     if (fitted) {
         objc_setAssociatedObject(self, kPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        labelSetLastResult(self, newText);
         [self setAttributedText:fitted];
     } else if (!widthKnown) {
         // 保留 pending
@@ -636,28 +672,40 @@ static BOOL isAlreadyAdjusted(NSAttributedString *attr) {
 }
 
 - (void)setAttributedText:(NSAttributedString *)attributedText {
+    // 若文本等于上次处理后的结果，直接放行（这就是防止无限累加的关键）
+    if (enabled && orderedFinds.count > 0 && self.tag != 317 && attributedText.length > 0) {
+        if (labelMatchesLastResult(self, attributedText.string)) {
+            %orig;
+            return;
+        }
+    }
+
     if (enabled && orderedFinds.count > 0 && self.tag != 317 && attributedText.length > 0 && !isAlreadyAdjusted(attributedText)) {
         BOOL shouldCompress = NO;
         NSAttributedString *newText = applyRulesForAttr(attributedText, &shouldCompress);
 
-        if (newText && ![attributedText.string isEqualToString:newText.string]) {
-            if (shouldCompress) {
-                BOOL widthKnown = NO;
-                NSAttributedString *fitted = fittedAttributedStringForLabel(newText.string, self, &widthKnown);
-                if (fitted) {
-                    objc_setAssociatedObject(self, kPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-                    attributedText = fitted;
-                    %orig;
-                    return;
-                } else if (!widthKnown) {
-                    objc_setAssociatedObject(self, kPendingKey, attributedText.string, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        if (newText) {
+            labelSetLastResult(self, newText.string);
+
+            if (![attributedText.string isEqualToString:newText.string]) {
+                if (shouldCompress) {
+                    BOOL widthKnown = NO;
+                    NSAttributedString *fitted = fittedAttributedStringForLabel(newText.string, self, &widthKnown);
+                    if (fitted) {
+                        objc_setAssociatedObject(self, kPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                        attributedText = fitted;
+                        %orig;
+                        return;
+                    } else if (!widthKnown) {
+                        objc_setAssociatedObject(self, kPendingKey, attributedText.string, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                    } else {
+                        objc_setAssociatedObject(self, kPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                    }
                 } else {
                     objc_setAssociatedObject(self, kPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
                 }
-            } else {
-                objc_setAssociatedObject(self, kPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                attributedText = newText;
             }
-            attributedText = newText;
         }
     }
     %orig;
