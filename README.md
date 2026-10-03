@@ -1,4 +1,4 @@
-# Ersatz
+# Ersatz Reborn
 Replace any text, system-wide!
  Fork of Ersatz by Skitty, updated for roothide and extended.
 
